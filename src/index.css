@@ -1,0 +1,936 @@
+@import "tailwindcss";
+
+:root {
+  --bg:#0b1220;
+  --surface:#0f172a;
+  --title:#e5e7eb;
+  --meta:#94a3b8;
+  --border: rgba(226, 232, 240, 0.4); /* softened border */
+  --accent:#60a5fa;
+  --glass-bg: color-mix(in srgb, var(--surface) 12%, transparent);
+  --glass-border: color-mix(in srgb, var(--border) 70%, transparent);
+  --glass-blur: 18px;
+  --content-pad: 16px;
+  --topnav-h: 56px; /* height of TopNav incl. padding */
+}
+
+@media (max-width: 960px) { :root { --content-pad: 12px; --topnav-h: 52px; } }
+
+html[data-theme='light'] {
+  --bg: #f6f7fb;
+  --surface: #ffffff;
+  --title: #0f172a;
+  --meta: #6b7280;
+  --border: rgba(203, 213, 225, 0.6); /* softened light border */
+  --accent: #60a5fa;
+}
+
+/* Legacy class toggle */
+:root.light {
+  --bg: #fdfcfb;
+  --surface: #ffffff;
+  --title: #1c1917;
+  --meta: #78716c;
+  --border: rgba(231, 229, 228, 0.7);
+  --accent: #60a5fa;
+}
+
+/* ==========================================================================
+   GLOBAL BASE
+   ========================================================================== */
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+html, body { min-height: 100% }
+
+body {
+  margin: 0;
+  color: var(--title);
+  font-family: ui-sans-serif, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial;
+}
+
+.h1 { 
+  font-size: 20px;
+  margin: 0 0 2px 0;
+  color: var(--title);
+}
+
+.muted {
+  color: var(--meta);
+  opacity: 0.85; /* soften meta text */
+}
+
+/* ==========================================================================
+   APP SHELL (LEFT NAV LAYOUT)
+   ========================================================================== */
+
+.whb-app--with-left-nav {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.whb-app__nav { position: sticky; top: 0; align-self: start; height: 100dvh; }
+.whb-app__main { min-width: 0; }
+/* Content padding uses a variable so children can 'bleed' to the column edges */
+.whb-app__content {
+  padding: var(--content-pad);
+}
+
+/* Left nav (desktop) */
+.whb-nav--left {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.whb-nav__header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px; border-bottom: 1px solid var(--border);
+}
+
+.whb-nav__toggle {
+  border: 1px solid var(--accent);
+  background: transparent; color: var(--title);
+  border-radius: 10px; padding: 6px 10px; cursor: pointer;
+}
+
+.whb-nav__brand { font-weight: 800; color: var(--title); }
+.whb-nav__list { list-style: none; margin: 0; padding: 8px; overflow: auto; }
+
+.whb-nav__group-label {
+  font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--meta); margin: 10px 12px 4px;
+}
+
+.whb-nav__link {
+  display: grid; grid-template-columns: 16px 1fr; align-items: center;
+  gap: 10px; padding: 8px 10px; border-radius: 10px; color: var(--title);
+}
+
+.whb-nav__link:hover { background: rgba(0,0,0,.06); }
+.whb-nav__link.is-active { background: rgba(0,0,0,.08); outline: 1px solid rgba(0,0,0,.08); }
+.whb-nav__dot { width: 6px; height: 6px; border-radius: 999px; background: var(--accent); }
+
+/* Collapsed rail (desktop) */
+.whb-nav--left.is-collapsed { width: 64px; }
+.whb-nav--left.is-collapsed .whb-nav__group-label,
+.whb-nav--left.is-collapsed .whb-nav__text { display: none; }
+
+/* Mobile drawer */
+@media (max-width: 960px) {
+  .whb-app--with-left-nav { grid-template-columns: 1fr; }
+  .whb-app__nav { position: static; height: auto; }
+
+  .whb-nav--left {
+    position: fixed; left: 0; top: 0; z-index: 50;
+    width: 248px; height: 100dvh;
+    transform: translateX(-100%);
+    transition: transform 180ms ease;
+    box-shadow: 0 20px 60px rgba(0,0,0,.25);
+  }
+  .whb-nav--left.is-open { transform: translateX(0); }
+
+  .whb-app__content { --content-pad: 12px; padding: var(--content-pad); }
+}
+
+.whb-nav__backdrop {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(0,0,0,.35);
+  backdrop-filter: saturate(120%) blur(1px);
+}
+
+/* Mobile menu trigger */
+.whb-nav__trigger {
+  display: none;
+}
+@media (max-width: 960px) {
+  .whb-nav__trigger {
+    display: inline-flex; align-items: center; justify-content: center;
+    position: fixed; top: 12px; left: 12px; z-index: 55;
+    width: 40px; height: 40px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--title);
+    box-shadow: 0 8px 24px rgba(0,0,0,.18); cursor: pointer;
+  }
+  .whb-app__content { padding-top: 56px; }
+}
+
+/* ==========================================================================
+   APP NAV BAR
+   ========================================================================== */
+
+/* Compact top bar */
+.whb-topnav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  height: var(--topnav-h);
+  background: color-mix(in srgb, var(--surface) 8%, transparent);
+  backdrop-filter: blur(14px) saturate(115%);
+  -webkit-backdrop-filter: blur(14px) saturate(115%);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.whb-topnav__inner {
+  display: flex;                 /* <-- critical */
+  align-items: center;           /* vertical centering */
+  justify-content: space-between;/* left | center | right areas */
+  height: calc(var(--topnav-h) - 1px); /* account for bottom border */
+  padding: 0 var(--content-pad);
+  max-width: 1024px;
+  margin: 0 auto;
+  gap: 12px;
+}
+
+.whb-topnav__brand { font-weight: 800; color: var(--title); }
+
+.whb-topnav__center { display: flex; justify-content: center; }
+.whb-topnav__picker {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 6px 10px; border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  background: color-mix(in srgb, var(--surface) 50%, transparent);
+}
+.whb-topnav__picker input[type="date"] {
+  background: transparent; border: 0; color: var(--title);
+  outline: none; padding: 4px 0;
+}
+
+.whb-topnav__actions {
+  display: inline-flex; justify-content: end; align-items: center; gap: 6px;
+}
+.whb-topnav__icon {
+  display: inline-grid; place-items: center;
+  width: 36px; height: 36px; border-radius: 10px;
+  color: var(--title);
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--surface) 35%, transparent);
+  transition: transform .08s ease, background-color .18s ease, border-color .18s ease;
+}
+.whb-topnav__icon:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.whb-topnav__icon.is-active {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 16%, transparent) inset;
+}
+
+.whb-topnav__more summary {
+  list-style: none; cursor: pointer;
+  display: inline-grid; place-items: center;
+  width: 36px; height: 36px; border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: color-mix(in srgb, var(--surface) 40%, transparent);
+}
+.whb-topnav__more[open] summary {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.whb-topnav__menu {
+  position: absolute; right: 0; margin-top: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px; padding: 6px;
+  display: grid; gap: 4px; min-width: 160px;
+}
+.whb-topnav__menu a {
+  padding: 8px 10px; border-radius: 8px; color: var(--title); text-decoration: none;
+}
+.whb-topnav__menu a:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+
+/* ==========================================================================
+   TOOLBAR
+   ========================================================================== */
+
+.toolbar {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--surface); backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+.toolbar-inner {
+  max-width: 1024px; margin: 0 auto; padding: 12px 20px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+/* Full-bleed container: makes a section span the viewport inside a padded layout */
+.full-bleed {
+  position: relative;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+  width: 100vw;
+}
+
+/* Bleed only to the edges of the content column (not the viewport) */
+.bleed-x {
+  margin-left: calc(var(--content-pad) * -1);
+  margin-right: calc(var(--content-pad) * -1);
+}
+
+/* Weekday chips strip: column-full, sticky, subtle divider */
+.week-strip {
+  position: sticky;
+  top: var(--topnav-h);    /* <-- sits just below TopNav */
+  z-index: 20;             /* below TopNav (40), above content */
+  background: var(--glass-bg);
+  border-bottom: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur)) saturate(115%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(115%);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06), 0 1px 0 rgba(0,0,0,0.02);
+}
+
+/* Inner padding of the strip matches the column padding */
+.week-strip__inner {
+  padding: 8px var(--content-pad);
+}
+
+.whb-app__content > .week-strip { margin-top: 0; }
+
+.week-strip__scroll {
+  position: relative;
+  overflow-x: auto; /* keep your overflow behavior */
+  -webkit-overflow-scrolling: touch;
+}
+
+.week-strip__scroll::before,
+.week-strip__scroll::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0; width: 24px; pointer-events: none;
+  z-index: 1;
+}
+
+.week-strip__scroll::before {
+  left: 0;
+  background: linear-gradient(to right,
+    color-mix(in srgb, var(--surface) 55%, transparent) 0%,
+    transparent 100%);
+}
+
+.week-strip__scroll::after {
+  right: 0;
+  background: linear-gradient(to left,
+    color-mix(in srgb, var(--surface) 55%, transparent) 0%,
+    transparent 100%);
+}
+
+/* Slightly lift the selected chip so it reads as interactive */
+button[role="tab"][aria-selected="true"] {
+  box-shadow: 0 2px 10px rgba(0,0,0,0.10);
+  transform: translateY(-1px);
+  transition: transform 120ms ease, box-shadow 160ms ease;
+}
+button[role="tab"]:hover {
+  box-shadow: 0 1px 8px rgba(0,0,0,0.08);
+}
+
+/* Body of the page uses the same padding so edges line up */
+.main-section {
+  padding: var(--content-pad);
+}
+
+/* Ensure the week strip is always flush with the very top */
+.whb-app__content > .week-strip {
+  margin-top: calc(var(--content-pad) * -1);
+}
+
+/* ==========================================================================
+   UI PRIMITIVES
+   ========================================================================== */
+
+.btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  border-radius: 10px;
+  color: var(--title);
+  cursor: pointer;
+  transition: border-color .2s ease, transform .1s ease;
+}
+.btn:hover { border-color: color-mix(in srgb, var(--border), var(--title) 20%); }
+.btn--active { border-color: var(--accent); }
+
+.input, .select, .textarea {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--title);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.textarea { min-height: 80px; width: 100%; }
+
+/* Cards: upgraded floating effect */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow:
+    0 4px 12px rgba(0,0,0,0.08),
+    0 2px 4px rgba(0,0,0,0.04);
+  transition: box-shadow 0.3s ease, transform 0.2s ease;
+}
+.card:hover {
+  box-shadow:
+    0 8px 20px rgba(0,0,0,0.12),
+    0 4px 8px rgba(0,0,0,0.06);
+  transform: translateY(-2px);
+}
+
+/* Simple utilities (kept for non-Tailwind areas) */
+.grid { display: grid; }
+.flex { display: flex; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.gap-4 { gap: 16px; }
+
+.p-4 { padding: 16px; }
+.p-5 { padding: 20px; }
+.mt-6 { margin-top: 24px; }
+.mx-auto { margin-left: auto; margin-right: auto; }
+.max-w-3xl { max-width: 768px; }
+.max-w-5xl { max-width: 1024px; }
+
+.grid-cols-1 { grid-template-columns: 1fr; }
+/* (Note: Tailwind handles responsive grid cols; custom md:grid-cols-3 not needed) */
+
+.pill { display: inline-block; border: 1px solid var(--border); border-radius: 999px; padding: 4px 8px; }
+
+.border { border: 1px solid var(--border); }
+.border-t { border-top: 1px solid var(--border); }
+.border-b { border-bottom: 1px solid var(--border); }
+.border-border { border-color: var(--border); }
+
+/* Ring (ProgressRing) */
+.ring { position: relative; display: inline-block; }
+.ring svg { display: block; }
+.ring .bg { stroke: #1f2937; }
+.ring .fg { stroke: var(--accent); }
+
+/* ==========================================================================
+   PROGRESS / SUMMARIES
+   ========================================================================== */
+
+.progress-rail {
+  height: 6px; border-radius: 999px;
+  background: rgba(148,163,184,.25); overflow: hidden;
+}
+.progress-fill {
+  height: 100%; border-radius: 999px; background: var(--accent);
+  transition: width .5s ease;
+}
+
+/* Optional helper for sticky headers (e.g., week pills bar) */
+.sticky-elevate {
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.03);
+}
+
+/* ==========================================================================
+   WIZARD (namespaced)
+   ========================================================================== */
+
+.whb-setup-banner {
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  border-radius: 12px; padding: 16px;
+}
+
+.whb-wizard-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: grid; place-items: center; z-index: 1000; }
+.whb-wizard {
+  width: min(960px, 96vw); max-height: 92vh; overflow: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0,0,0,.35);
+}
+.whb-wizard-head { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.whb-wizard-title { font-size: 20px; font-weight: 700; color: var(--title); }
+.whb-wizard-stepper { display: flex; gap: 8px; align-items: center; }
+.whb-step-dot { width: 10px; height: 10px; border-radius: 999px; background: rgba(148,163,184,.4); }
+.whb-step-dot.active { background: var(--accent); }
+.whb-wizard-body { padding: 24px; }
+.whb-wizard-cta { display: flex; justify-content: space-between; padding: 16px 24px; border-top: 1px solid var(--border); position: sticky; bottom: 0; background: var(--surface); }
+
+/* ==========================================================================
+   TOAST / CONFETTI
+   ========================================================================== */
+
+.toast-stack { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 9999; }
+.toast { background: var(--bg); border: 1px solid var(--border); color: #e5e7eb; padding: 10px 12px; border-radius: 10px; }
+
+.confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 9998; }
+.confetti .p { position: absolute; font-size: 20px; animation: fall 900ms ease-out forwards; opacity: 0; }
+@keyframes fall {
+  0% { transform: translateY(-20px) scale(.9); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateY(40px) scale(1); opacity: 0; }
+}
+
+/* ==========================================================================
+   CONTENT SECTIONS
+   ========================================================================== */
+
+.section-title { font-weight: 600; color: var(--title); }
+
+.subcard {
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.subhead {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.subhead .label { font-weight: 600; color: var(--title); display: flex; align-items: center; gap: 8px; }
+
+/* Subhead right-hand label: slightly warmer and lighter */
+.subhead .right {
+  font-size: 12px;
+  color: var(--meta);
+  opacity: 0.85; /* match muted tone */
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Borders: soften by blending with bg */
+.border,
+.border-t,
+.border-b,
+.border-border {
+  border-color: color-mix(in srgb, var(--border) 85%, var(--bg) 15%);
+}
+
+/* Constrain the main content and give it side padding */
+.content-wrap {
+  padding: var(--content-pad);
+}
+
+/* ==========================================================================
+   PRINT
+   ========================================================================== */
+
+@media print {
+  .toolbar { position: sticky; top: 0; z-index: 10; background: var(--surface); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+  .toolbar .btn, nav { display: none; }
+  body { background: #fff; color: #000; }
+  .card { box-shadow: none; border-color: #000; }
+}
+
+/* ==========================================================================
+   BACKGROUNDS (BOKEH)
+   - Apply .bg-bokeh to your main app container (not body) for subtle color.
+   ========================================================================== */
+
+.bg-bokeh {
+  min-height: 100dvh; /* Always fills at least the viewport height */
+  background: var(--bg);
+  background:
+    radial-gradient(circle at 20% 20%,  rgba(255, 200, 150, 0.40) 0%, transparent 50%),
+    radial-gradient(circle at 80% 30%,  rgba(255, 150, 200, 0.30) 0%, transparent 50%),
+    radial-gradient(circle at 50% 80%,  rgba(150, 200, 255, 0.30) 0%, transparent 50%),
+    #fdfdfd;
+  background-attachment: fixed;
+  background-size: cover;
+  animation: bg-shift 30s ease-in-out infinite alternate;
+}
+
+@keyframes bg-shift {
+  0%   { background-position: 0% 0%, 100% 0%, 50% 100%; }
+  100% { background-position: 30% 20%, 70% 40%, 40% 80%; }
+}
+
+/* ==========================================================================
+   LEFT NAV — VISUAL UPGRADE (appended)
+   ========================================================================== */
+
+/* Subtle gradient & separation from the sticky header */
+.whb-nav--left {
+  background:
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--surface) 85%, transparent) 0%,
+      color-mix(in srgb, var(--surface) 95%, transparent) 60%,
+      color-mix(in srgb, var(--surface) 100%, transparent) 100%
+    );
+  border-right: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+  box-shadow: 6px 0 22px rgba(0,0,0,0.10);
+}
+
+/* Header polish */
+.whb-nav__header {
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+/* Link feel & motion */
+.whb-nav__link {
+  grid-template-columns: 20px 1fr; /* slightly larger icon rail */
+  padding: 10px 12px;
+  border-radius: 12px;
+  position: relative;
+  transition: background-color .18s ease, outline-color .18s ease, transform .1s ease;
+}
+
+/* Hover tint using accent */
+.whb-nav__link:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+/* Active item: soft fill, outline, and accent rail */
+.whb-nav__link.is-active {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.whb-nav__link.is-active::before {
+  content: "";
+  position: absolute;
+  left: 6px; top: 8px; bottom: 8px; width: 3px;
+  border-radius: 3px;
+  background: var(--accent);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+/* Icon dot → slightly larger pill with glow */
+.whb-nav__dot {
+  width: 8px; height: 8px; border-radius: 999px; background: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+/* Group label: quieter spacing & tone */
+.whb-nav__group-label {
+  font-size: 10px;
+  letter-spacing: .08em;
+  color: color-mix(in srgb, var(--meta) 80%, transparent);
+  margin: 12px 12px 6px;
+}
+
+/* Collapsed rail behavior */
+.whb-nav--left.is-collapsed .whb-nav__link {
+  justify-content: center;
+  grid-template-columns: 1fr;
+  padding: 10px;
+}
+
+.whb-nav--left.is-collapsed .whb-nav__link.is-active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  outline-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* In collapsed mode, switch the active rail to a dot in the corner */
+.whb-nav--left.is-collapsed .whb-nav__link.is-active::before {
+  left: auto; top: auto; bottom: 6px; right: 6px; width: 6px; height: 6px;
+  border-radius: 999px;
+}
+
+/* Mobile drawer elevation & clarity above glass header */
+@media (max-width: 960px) {
+  .whb-nav--left {
+    box-shadow: 0 24px 60px rgba(0,0,0,.28);
+    background:
+      linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--surface) 92%, transparent) 0%,
+        color-mix(in srgb, var(--surface) 98%, transparent) 100%
+      );
+  }
+}
+
+
+/* ===== DayCard visual polish (non-breaking) ===== */
+
+/* Card overall — soften shadow & radius slightly (already defined; just refine) */
+.card {
+  border-radius: 14px;              /* a touch tighter */
+  box-shadow:
+    0 3px 10px rgba(0,0,0,0.07),
+    0 2px 4px rgba(0,0,0,0.04);
+}
+
+/* Section containers */
+.subcard {
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border-radius: 12px;
+  padding: 12px;
+  transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+/* When a section is marked completed, make it feel “settled” */
+.subcard.is-done {
+  background: color-mix(in srgb, var(--surface) 92%, var(--accent) 4%);
+  border-color: color-mix(in srgb, var(--border) 70%, var(--accent) 12%);
+}
+
+/* Section header */
+.subhead {
+  margin-bottom: 10px;
+}
+.subhead .label {
+  font-weight: 700;
+  letter-spacing: .01em;
+}
+.subhead .right {
+  gap: 8px;
+  opacity: .9;
+}
+
+/* Inputs — unify sizing & add focus ring */
+.input, .select, .textarea {
+  border-radius: 10px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+.input:focus, .select:focus, .textarea:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  background: color-mix(in srgb, var(--surface) 98%, var(--accent) 2%);
+}
+
+/* “Completed” checkbox alignment & affordance */
+.subhead .right input[type="checkbox"] {
+  inline-size: 18px;
+  block-size: 18px;
+  accent-color: var(--accent);
+}
+
+/* Small “pill” summary line under summary header — nudge spacing */
+.collapsed-summary { gap: 6px; }
+
+/* Mini progress at the bottom — smoother motion and softer track */
+.progress-rail {
+  height: 6px;
+  background: color-mix(in srgb, var(--border) 35%, transparent);
+}
+.progress-fill {
+  transition: width .45s cubic-bezier(.22,1,.36,1), background-color .2s;
+}
+
+/* Micro-hover to make each subcard feel interactive even before actions */
+.subcard:hover {
+  box-shadow: 0 6px 18px rgba(0,0,0,.06);
+}
+
+/* “Meta” small copy softening inside sections */
+.subcard .muted {
+  opacity: 0.9;
+}
+
+/* Optional: section dividers when stacked on mobile */
+@media (max-width: 768px) {
+  .subcard + .subcard {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
+}
+
+/* Optional: sticky subhead on very long forms (mobile ergonomics) */
+@media (max-width: 640px) {
+  .subcard .subhead {
+    position: sticky;
+    top: calc(48px + 8px); /* below your sticky chips header + a little air */
+    z-index: 1;
+    background: inherit;
+    padding-block: 6px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+    margin-bottom: 8px;
+  }
+}
+
+
+/* Flash when a block is marked done */
+.flash-done {
+  animation: whb-flash .45s ease-out;
+}
+@keyframes whb-flash {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 28%, transparent); }
+  50%  { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 18%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+
+
+
+/* === Hour Grid === */
+.hour-grid { width: 100%; }
+
+.hour-grid__rail {
+  position: relative;
+  height: 92px; /* compact row */
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background:
+    linear-gradient(to bottom, rgba(255,255,255,0.02), transparent),
+    var(--surface);
+  overflow: hidden;
+}
+
+.hour-grid__ghost {
+  position: absolute; top: 0; bottom: 0;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-left: 1px dashed color-mix(in srgb, var(--accent) 35%, transparent);
+  border-right: 1px dashed color-mix(in srgb, var(--accent) 35%, transparent);
+  pointer-events: none;
+}
+
+.hour-grid__block {
+  position: absolute; top: 10px; height: 72px;
+  border-radius: 10px;
+  color: #0b1220;
+  display: flex; align-items: center;
+  box-shadow: 0 6px 20px rgba(0,0,0,.18);
+}
+
+.hour-grid__drag {
+  flex: 1;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  cursor: grab;
+  user-select: none;
+}
+.hour-grid__drag:active { cursor: grabbing; }
+.hour-grid__drag-label { font-weight: 600; }
+.hour-grid__time { font-size: 12px; opacity: .8; }
+
+.hour-grid__handle {
+  width: 10px;
+  cursor: ew-resize;
+  background: rgba(255,255,255,.3);
+}
+.handle--start { border-radius: 10px 0 0 10px; }
+.handle--end   { border-radius: 0 10px 10px 0; }
+
+.hour-grid__marks {
+  position: absolute; inset: 0;
+  pointer-events: none;
+}
+.hour-grid__mark {
+  position: absolute; top: 0; bottom: 0;
+}
+.hour-grid__tick {
+  position: absolute; top: 0; bottom: 0;
+  width: 1px; background: color-mix(in srgb, var(--border) 80%, transparent);
+}
+.hour-grid__label {
+  position: absolute; bottom: 6px; left: 6px;
+  font-size: 11px; color: var(--meta); background: color-mix(in srgb, var(--surface) 75%, transparent);
+  padding: 2px 6px; border-radius: 6px; backdrop-filter: blur(6px);
+}
+
+/* distribute hour marks evenly */
+.hour-grid__marks > .hour-grid__mark {
+  /* We'll fill positions via inline calc() from the component */
+}
+
+
+/* === Vertical Hour Grid === */
+.vgrid { width: 100%; }
+
+.vgrid__rail {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background:
+    linear-gradient(to right, rgba(255,255,255,0.02), transparent),
+    var(--surface);
+  overflow: hidden;
+}
+
+/* Suggested “ghost” windows */
+.vgrid__ghost {
+  position: absolute; left: 0; right: 0;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-top: 1px dashed color-mix(in srgb, var(--accent) 35%, transparent);
+  border-bottom: 1px dashed color-mix(in srgb, var(--accent) 35%, transparent);
+  pointer-events: none;
+}
+
+/* Draggable blocks */
+.vgrid__block {
+  position: absolute; left: 8px; right: 8px;
+  border-radius: 10px;
+  color: #0b1220;
+  display: flex; flex-direction: column;
+  box-shadow: 0 6px 20px rgba(0,0,0,.18);
+}
+
+.vgrid__drag {
+  flex: 1;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 8px 10px;
+  cursor: grab; user-select: none;
+}
+.vgrid__drag:active { cursor: grabbing; }
+.vgrid__drag-label { font-weight: 600; }
+.vgrid__time { font-size: 12px; opacity: .85; }
+
+.vgrid__handle {
+  height: 8px;
+  background: rgba(255,255,255,.3);
+  cursor: ns-resize;
+}
+.handle--start { border-radius: 10px 10px 0 0; }
+.handle--end   { border-radius: 0 0 10px 10px; }
+
+/* Hour marks */
+.vgrid__marks { position: absolute; inset: 0; pointer-events: none; }
+.vgrid__mark { position: absolute; left: 0; right: 0; }
+.vgrid__tick {
+  position: absolute; left: 0; right: 0; height: 1px;
+  background: color-mix(in srgb, var(--border) 80%, transparent);
+}
+.vgrid__label {
+  position: absolute; right: 6px; top: -10px;
+  font-size: 11px; color: var(--meta);
+  background: color-mix(in srgb, var(--surface) 75%, transparent);
+  padding: 2px 6px; border-radius: 6px; backdrop-filter: blur(6px);
+}
+
+.vgrid__block.is-active {
+  outline: 2px solid color-mix(in srgb, #fff 50%, var(--accent));
+  box-shadow: 0 10px 24px rgba(0,0,0,.20);
+}
+
+
+.storage-badge{
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:12px; color:var(--meta);
+  padding:4px 8px; border-radius:999px;
+  border:1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px) saturate(115%);
+}
+.storage-badge__dot{ width:8px; height:8px; border-radius:50%; background:#a3a3a3; }
+.storage-badge__dot.is-cloud{ background: var(--accent); }
+.storage-badge__dot.is-local{ background: #9ca3af; } /* neutral gray */
+.storage-badge__text{ letter-spacing:.02em; }
+
+
+
+/* somewhere in your CSS */
+.storage-badge__dot.is-loading {
+  background: linear-gradient(90deg, var(--border), var(--accent), var(--border));
+  background-size: 200% 100%;
+  animation: badge-sheen 1.2s linear infinite;
+}
+@keyframes badge-sheen {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
