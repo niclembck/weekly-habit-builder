@@ -908,6 +908,22 @@ button[role="tab"]:hover {
   box-shadow: 0 10px 24px rgba(0,0,0,.20);
 }
 
+/* --- HourGridVertical healing hint --- */
+.vgrid__block--healed {
+  animation: vgrid-heal 320ms ease-out;
+}
+
+@keyframes vgrid-heal {
+  0%   { transform: translateY(4px) scale(0.995); opacity: .6; }
+  100% { transform: none; opacity: 1; }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .vgrid__block--healed { animation: none; }
+}
+
+
 
 .storage-badge{
   display:inline-flex; align-items:center; gap:6px;

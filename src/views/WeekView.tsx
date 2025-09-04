@@ -236,7 +236,7 @@ export default function WeekView() {
             <DayCard
               collapsible={false}
               day={selectedDay}
-              date={dates[selectedDay]}
+              date={dates[selectedDay] ?? new Date()}
               entry={(week as any)[selectedDay]}
               projects={settings.projects}
               activityColors={settings.activityColors}

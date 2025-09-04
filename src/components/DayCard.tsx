@@ -1,5 +1,5 @@
 // src/components/DayCard.tsx
-import React, { useMemo } from 'react'
+import React from 'react'
 import { Day, SuggestedSlots } from '../types'
 import HourGridVertical from './HourGridVertical'
 import BlockFlyout from './BlockFlyout'
@@ -9,7 +9,7 @@ type SlotKey = 'morning'|'midday'|'activity'
 type Props = {
   collapsible?: boolean
   day: Day
-  date: Date
+  date?: Date
   entry: any
   projects: string[]
   activityColors: Record<string,string>
@@ -42,17 +42,25 @@ export default function DayCard(props: Props) {
     suggestedSlots
   } = props
 
-  const dateLabel = useMemo(
-    () => date.toLocaleDateString(undefined, { month:'short', day:'numeric' }),
-    [date]
-  )
+  // Safe date formatting
+  const safeDate = React.useMemo(() => {
+    if (!date) return null
+    const d = new Date(date)
+    return isNaN(d.getTime()) ? null : d
+  }, [date])
+
+  const dateLabel = React.useMemo(() => {
+    return safeDate
+      ? safeDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+      : ''
+  }, [safeDate])
 
   // —— Flyout state & helpers ——
   const [editing, setEditing] = React.useState<SlotKey|null>(null)
   const openEdit  = (slot: SlotKey) => setEditing(slot)
   const closeEdit = () => setEditing(null)
 
-  // Grid will call this when a block is clicked
+  // Grid will call this when a block is clicked (via onOpenFlyout)
   const handleGridEdit = (slot: SlotKey) => openEdit(slot)
 
   function handleCheck(field: 'doneMorning'|'doneMidday'|'doneActivity', label: string){
@@ -98,24 +106,19 @@ export default function DayCard(props: Props) {
     return s.activity
   }
 
-  // ——— Header: day + date (kept minimal) ———
+  // ——— Header: day + date (minimal) ———
   const header = (
     <div className="p-5 flex items-center justify-between">
       <div className="flex items-baseline gap-2">
-        <div className="text-base font-semibold" style={{color:'var(--title)'}}>{day}</div>
-        <div className="muted text-sm">• {dateLabel}</div>
+        <div className="text-base font-semibold" style={{ color: 'var(--title)' }}>{day}</div>
+        {dateLabel && <div className="muted text-sm">• {dateLabel}</div>}
       </div>
-      {entry.therapy && (
-        <span className="ml-4 text-[11px] font-medium px-2 py-1 rounded-full border border-border" style={{color:'var(--accent)'}}>
-          Therapy @ 6pm (biweekly)
-        </span>
-      )}
     </div>
   )
 
   const body = (
     <div className="p-5 pt-0">
-      {/* Summary line (read-only; editing now happens via grid click → flyout) */}
+      {/* Summary line (read-only; editing via grid → flyout) */}
       <div className="collapsed-summary flex flex-wrap items-center gap-2 mb-4">
         <Pill text={'AM: ' + withEmoji(entry.morningProject || '—', projectEmojis[entry.morningProject])} done={!!entry.doneMorning} />
         <Pill text={'Mid: ' + withEmoji(entry.middayProject || '—', projectEmojis[entry.middayProject])} done={!!entry.doneMidday} />
@@ -124,7 +127,7 @@ export default function DayCard(props: Props) {
       </div>
 
       <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
-        {/* MAIN COLUMN: Vertical hour grid only (click blocks to edit) */}
+        {/* MAIN COLUMN: Vertical hour grid (click blocks to edit) */}
         <div className="grid gap-4">
           <HourGridVertical
             morningActualStart={entry.morningActualStart}
@@ -139,34 +142,35 @@ export default function DayCard(props: Props) {
               activity: suggestedSlots?.activity,
             }}
             onChange={onChange}
-            onEdit={handleGridEdit}   // <-- NEW: open flyout from grid
+            onOpenFlyout={handleGridEdit}   // ← wire flyout open
             startHour={6}
             endHour={22}
             hourPx={48}
-            // (Optional) completion toggles from small badges on blocks
-            onToggleDone={(slot) => {
-              if (slot === 'morning') onChange({ doneMorning: !entry.doneMorning })
-              else if (slot === 'midday') onChange({ doneMidday: !entry.doneMidday })
-              else onChange({ doneActivity: !entry.doneActivity })
-            }}
+            preventOverlap={true}
           />
 
-          {/* Small completion toggles below grid (kept, minimal) */}
+          {/* Small completion toggles below grid */}
           <div className="grid grid-cols-3 gap-2">
             <label className="right">
-              <input type="checkbox" className="w-4 h-4"
+              <input
+                type="checkbox"
+                className="w-4 h-4"
                 checked={!!entry.doneMorning}
                 onChange={handleCheck('doneMorning','Morning Work')}
               /> Morning done
             </label>
             <label className="right">
-              <input type="checkbox" className="w-4 h-4"
+              <input
+                type="checkbox"
+                className="w-4 h-4"
                 checked={!!entry.doneMidday}
                 onChange={handleCheck('doneMidday','Midday Work')}
               /> Midday done
             </label>
             <label className="right">
-              <input type="checkbox" className="w-4 h-4"
+              <input
+                type="checkbox"
+                className="w-4 h-4"
                 checked={!!entry.doneActivity}
                 onChange={handleCheck('doneActivity','Activity')}
               /> Activity done
@@ -174,7 +178,7 @@ export default function DayCard(props: Props) {
           </div>
         </div>
 
-        {/* SIDEBAR: kept on-card (not part of flyout) */}
+        {/* SIDEBAR */}
         <div className="grid gap-4">
           <div className="subcard">
             <div className="subhead"><div className="label">💡 Gratitude</div></div>
@@ -209,7 +213,7 @@ export default function DayCard(props: Props) {
         </div>
       </div>
 
-      {/* Contextual details flyout (now the only place for block details) */}
+      {/* Contextual details flyout */}
       <BlockFlyout
         open={editing !== null}
         slot={editing}

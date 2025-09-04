@@ -4,16 +4,41 @@ import { Day, DayEntry } from '../types'
 import { countObjectives } from '../utils/countObjectives'
 
 type Props = {
-  monthAnchor: Date
-  week: Record<Day, DayEntry>
-  dates: Record<Day, Date>
+  monthAnchor: Date            // any date in the month to render (can be anything coercible to Date)
+  week: Record<Day, DayEntry>  // current week's entries
+  dates: Record<Day, Date>     // current week's date map
   onSelectDay?: (d: Day) => void
-  /** Size of each day cell in px (square) */
   cellSize?: number
 }
 
-const DAYS: Day[] = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
-const dow = (d: Date) => d.getDay() // 0=Sun..6=Sat
+const DAYS_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] as const
+const DAY_KEYS: Day[] = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+
+// ---- Safe date helpers ------------------------------------------------------
+
+function toValidDate(v: any): Date {
+  const d = v instanceof Date ? v : new Date(v)
+  return isNaN(d.getTime()) ? new Date() : d
+}
+function sameDay(a?: Date, b?: Date) {
+  if (!a || !b) return false
+  return toValidDate(a).toDateString() === toValidDate(b).toDateString()
+}
+function safeFormat(d?: Date, opts?: Intl.DateTimeFormatOptions) {
+  if (!d) return ''
+  const x = toValidDate(d)
+  return isNaN(x.getTime()) ? '' : x.toLocaleDateString(undefined, opts)
+}
+function startOfMonth(d: Date) { const x = toValidDate(d); x.setDate(1); x.setHours(0,0,0,0); return x }
+function endOfMonth(d: Date) { const x = toValidDate(d); x.setMonth(x.getMonth()+1,0); x.setHours(0,0,0,0); return x }
+function startOfWeekMonday(d: Date) {
+  const x = toValidDate(d)
+  const day = (x.getDay() || 7) // Sun->7
+  if (day !== 1) x.setDate(x.getDate() - (day - 1))
+  x.setHours(0,0,0,0)
+  return x
+}
+function addDays(d: Date, n: number) { const x = toValidDate(d); x.setDate(x.getDate() + n); return x }
 
 export default function MonthMini({
   monthAnchor,
@@ -22,118 +47,145 @@ export default function MonthMini({
   onSelectDay,
   cellSize = 18,
 }: Props) {
-  const year = monthAnchor.getFullYear()
-  const month = monthAnchor.getMonth()
+  // Anchor the month safely
+  const anchor = React.useMemo(() => toValidDate(monthAnchor), [monthAnchor])
+  const today = React.useMemo(() => new Date(), [])
 
-  // First day of month, and how many days it has
-  const firstOfMonth = new Date(year, month, 1)
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const mo = React.useMemo(() => startOfMonth(anchor), [anchor])
+  const lo = React.useMemo(() => endOfMonth(anchor), [anchor])
 
-  // Build a 6x7 grid of Dates covering the month (including leading/trailing days)
-  const startOffset = (dow(firstOfMonth) + 6) % 7 // shift so Monday=0
-  const grid: Date[] = []
-  for (let i = 0; i < 42; i++) {
-    const dayNum = i - startOffset + 1
-    grid.push(new Date(year, month, dayNum))
+  // grid runs from the Monday on/preceding the 1st to the Sunday on/following the last day
+  const gridStart = React.useMemo(() => startOfWeekMonday(mo), [mo])
+  const gridEnd = React.useMemo(() => addDays(startOfWeekMonday(addDays(lo, 7)), -1), [lo])
+
+  // Build array of dates
+  const days: Date[] = React.useMemo(() => {
+    const out: Date[] = []
+    for (let d = new Date(gridStart); d <= gridEnd; d = addDays(d, 1)) out.push(new Date(d))
+    return out
+  }, [gridStart, gridEnd])
+
+  // map current week's dates -> day key for quick lookup
+  const weekMap = React.useMemo(() => {
+    const m = new Map<string, Day>()
+    for (const dk of DAY_KEYS) {
+      const dt = dates[dk]
+      if (dt) m.set(toValidDate(dt).toDateString(), dk)
+    }
+    return m
+  }, [dates])
+
+  // helper: color intensity based on completion %
+  function bgForPct(pct: number) {
+    // 0 → very faint; 100 → solid accent
+    const a =
+      pct >= 100 ? 1.0 :
+      pct >= 75  ? 0.8 :
+      pct >= 50  ? 0.6 :
+      pct >= 25  ? 0.4 : 0.22
+    return `color-mix(in srgb, var(--accent) ${Math.round(a*100)}%, transparent)`
   }
 
-  // Reverse map: which Day enum corresponds to which date in the current displayed week
-  const dayByDateString = new Map<string, Day>()
-  for (const d of DAYS) {
-    const dt = dates[d]
-    if (dt) dayByDateString.set(dt.toDateString(), d)
+  // style tokens
+  const size = cellSize
+  const cellStyle: React.CSSProperties = {
+    width: size, height: size,
+    borderRadius: 6,
+    border: '1px solid color-mix(in srgb, var(--border) 70%, transparent)',
+    display: 'grid', placeItems: 'center',
+    fontSize: 10, lineHeight: 1, userSelect: 'none',
   }
 
-  const isSameMonth = (d: Date) => d.getMonth() === month
-  const fmt = (d: Date) => d.toLocaleDateString(undefined, { day: 'numeric' })
+  // Which dates are the current week (to outline that row subtly)
+  const currentWeekDates = React.useMemo(
+    () => new Set<string>(Object.values(dates).map(d => d ? toValidDate(d).toDateString() : '')),
+    [dates]
+  )
+
+  // Month label (guarded)
+  const monthLabel = safeFormat(anchor, { month: 'short', year: 'numeric' })
 
   return (
-    <div
-      aria-label="Monthly heatmap"
-      className="mini-month"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(7, 1fr)',
-        gap: 2,
-        padding: 4,
-        border: '1px solid var(--border)',
-        borderRadius: 10,
-        background: 'var(--surface)',
-      }}
-    >
-      {grid.map((d, idx) => {
-        const key = `${d.toDateString()}_${idx}`
-        const dayEnum = dayByDateString.get(d.toDateString())
-        const inThisMonth = isSameMonth(d)
+    <div className="monthmini" style={{ display:'grid', gap: 8 }}>
+      <div className="flex items-center justify-between">
+        <div className="muted text-xs">{monthLabel}</div>
+        <div className="flex items-center gap:2">
+          <span className="muted text-[10px]">Completion</span>
+          <span title="low"  style={{ width:10, height:10, borderRadius:2, background:bgForPct(25),  display:'inline-block' }} />
+          <span title="med"  style={{ width:10, height:10, borderRadius:2, background:bgForPct(50),  display:'inline-block' }} />
+          <span title="high" style={{ width:10, height:10, borderRadius:2, background:bgForPct(100), display:'inline-block' }} />
+        </div>
+      </div>
 
-        // Completion tint (only for days that exist in the current week)
-        let pct = 0
-        if (dayEnum) {
-          const { pct: p } = countObjectives(week[dayEnum])
-          pct = p
-        }
+      {/* weekday headers */}
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+        {DAYS_LABELS.map(lbl => (
+          <div key={lbl} className="muted text-[10px] text-center" style={{ paddingBottom: 2 }}>
+            {lbl}
+          </div>
+        ))}
+      </div>
 
-        // Visuals
-        const size = cellSize
-        const base = 'color-mix(in srgb, var(--accent) 18%, transparent)'
-        const tint =
-          pct >= 90 ? 'color-mix(in srgb, var(--accent) 90%, transparent)' :
-          pct >= 70 ? 'color-mix(in srgb, var(--accent) 70%, transparent)' :
-          pct >= 40 ? 'color-mix(in srgb, var(--accent) 40%, transparent)' :
-          pct >   0 ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : base
+      {/* calendar grid */}
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+        {days.map((raw) => {
+          const d = toValidDate(raw)
+          const inMonth = d.getMonth() === mo.getMonth()
+          const isToday = sameDay(d, today)
+          const dKey = weekMap.get(d.toDateString()) // only populated for the current week
+          const pct = dKey ? countObjectives(week[dKey]).pct : null
 
-        const bg = dayEnum ? tint : 'transparent'
-        const color = inThisMonth ? 'var(--title)' : 'var(--meta)'
+          const bg = pct != null ? bgForPct(pct) : (inMonth ? 'rgba(148,163,184,.14)' : 'transparent')
+          const fg = inMonth ? 'var(--title)' : 'var(--meta)'
+          const title =
+            safeFormat(d, { weekday:'short', month:'short', day:'numeric' }) +
+            (pct != null ? ` — ${pct}% complete` : '')
 
-        // Clickable only if this cell corresponds to a Week day we know about
-        const clickable = Boolean(dayEnum && onSelectDay)
+          // subtle outline for cells that belong to the currently displayed week
+          const outline = currentWeekDates.has(d.toDateString())
+            ? '1px solid color-mix(in srgb, var(--accent) 40%, transparent)'
+            : '1px solid color-mix(in srgb, var(--border) 70%, transparent)'
 
-        if (clickable) {
+          const onClick = dKey && onSelectDay
+            ? () => onSelectDay(dKey)
+            : undefined
+
           return (
             <button
-              key={key}
+              key={d.toISOString()}
               type="button"
-              className="mini-month__cell"
-              aria-label={`Select ${dayEnum}`}
-              onClick={() => onSelectDay?.(dayEnum!)}
+              title={title}
+              onClick={onClick}
+              className="monthmini__cell"
+              aria-label={title}
               style={{
-                width: size, height: size,
-                borderRadius: 6,
-                border: '1px solid var(--border)',
+                ...cellStyle,
                 background: bg,
-                display: 'grid',
-                placeItems: 'center',
-                fontSize: 10,
-                color,
-                cursor: 'pointer',
+                color: fg,
+                border: outline,
+                position:'relative',
+                opacity: inMonth ? 1 : 0.55,
+                cursor: dKey && onSelectDay ? 'pointer' : 'default',
               }}
-              title={`${dayEnum}`}
             >
-              {fmt(d)}
+              <span style={{ fontSize: 10, opacity: 0.9 }}>{d.getDate()}</span>
+
+              {/* today ring */}
+              {isToday && (
+                <span
+                  aria-hidden
+                  style={{
+                    position:'absolute',
+                    inset:-2,
+                    borderRadius:8,
+                    border:'1px solid color-mix(in srgb, var(--accent) 60%, #fff 0%)'
+                  }}
+                />
+              )}
             </button>
           )
-        }
-
-        return (
-          <div
-            key={key}
-            className="mini-month__cell--muted"
-            style={{
-              width: size, height: size,
-              borderRadius: 6,
-              border: '1px solid var(--border)',
-              background: 'transparent',
-              display: 'grid',
-              placeItems: 'center',
-              fontSize: 10,
-              color,
-            }}
-            aria-hidden
-          >
-            {fmt(d)}
-          </div>
-        )
-      })}
+        })}
+      </div>
     </div>
   )
 }
