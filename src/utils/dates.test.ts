@@ -100,4 +100,17 @@ describe("dates utils", () => {
     const bad = toValidDate('not-a-date')
     expect(bad instanceof Date).toBe(true)
   })
+
+  it('endOfMonth handles leap year February', () => {
+    const feb = new Date('2024-02-15')
+    const end = endOfMonth(feb)
+    expect(end.getUTCDate()).toBe(29)
+  })
+
+  it('startOfWeekMonday normalizes Sunday to Monday', () => {
+    const sun = new Date('2025-09-07') // Sunday
+    const mon = startOfWeekMonday(sun)
+    expect(mon.getDay()).toBe(1)
+    expect(mon.getDate()).toBeLessThan(sun.getDate())
+  })
 });

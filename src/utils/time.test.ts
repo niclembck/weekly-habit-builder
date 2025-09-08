@@ -21,4 +21,17 @@ describe('time utils', () => {
     const round = toHHMM(toMin('08:30'))
     expect(round).toBe('08:30')
   })
+
+  it('parses midnight and leading zero omission', () => {
+    expect(toMin('0:00')).toBe(0)
+    expect(toMin('00:00')).toBe(0)
+  })
+
+  it('formats exactly midnight', () => {
+    expect(toHHMM(0)).toBe('00:00')
+  })
+
+  it('clamps negative minutes to 00:00', () => {
+    expect(toHHMM(-30)).toBe('00:00')
+  })
 })

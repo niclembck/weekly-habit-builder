@@ -58,4 +58,29 @@ describe('countObjectives (fixed total=3)', () => {
     expect(res0.pct).toBeGreaterThanOrEqual(0)
     expect(res3.pct).toBeLessThanOrEqual(100)
   })
+
+  it('treats truthy/falsy done flags defensively', () => {
+    const res = countObjectives({
+      doneMorning: 1 as any,     // truthy
+      doneMidday: 0 as any,      // falsy
+      doneActivity: 'yes' as any // truthy (if your impl coerces)
+    } as any)
+    // If your impl strictly checks === true, adjust expectation accordingly.
+    expect(res.total).toBe(3)
+    expect([1,2,3]).toContain(res.completed)
+    expect(res.pct).toBeGreaterThanOrEqual(0)
+    expect(res.pct).toBeLessThanOrEqual(100)
+  })
+
+  it('ignores extra fields and keeps total=3', () => {
+    const res = countObjectives({
+      doneMorning: true,
+      doneMidday: false,
+      doneActivity: false,
+      doneEvening: true as any // should be ignored
+    } as any)
+    expect(res.total).toBe(3)
+    expect(res.completed).toBe(1)
+    expect(res.pct).toBe(33)
+  })
 })

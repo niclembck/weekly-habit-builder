@@ -5,49 +5,71 @@ import { toMin, toHHMM } from '../utils/time'
 type BlockKey = 'morning' | 'midday' | 'activity'
 
 type Props = {
-  // Times
   morningActualStart?: string; morningActualEnd?: string
   middayActualStart?: string;  middayActualEnd?: string
   activityActualStart?: string; activityActualEnd?: string
-
-  // Suggested (ghosts)
   suggested?: {
     morning?: { start: string, end: string }
     midday?:  { start: string, end: string }
     activity?:{ start: string, end: string }
   }
-
-  // Labels override
   labels?: Partial<Record<BlockKey, string>>
-
-  // Data update
   onChange: (patch: Partial<any>) => void
 
-  // Selection + UX hooks
+  /** Selection + UX hooks */
   active?: BlockKey | null
   onSelect?: (which: BlockKey) => void
   onRequestFocusTimes?: (which: BlockKey, whichField: 'start' | 'end' | 'both') => void
   onNudgeRequest?: (which: BlockKey, minutesDelta: number) => void
 
-  // Optional: open your flyout from here
+  /** Optional: open your flyout from here */
   onOpenFlyout?: (which: BlockKey) => void
 
-  // Optional: called when user clicks a block (used by tests/DayCard to open flyout)
-  onEdit?: (which: BlockKey) => void
-
-  // Behavior
+  /** Behavior */
   preventOverlap?: boolean
 
-  // Layout
   startHour?: number  // default 6
   endHour?: number    // default 22
   hourPx?: number     // pixels per hour (default 48)
+
+  /** old alias kept for compatibility in tests */
+  onEdit?: (which: BlockKey) => void
 }
 
 const DEFAULT_COLORS: Record<BlockKey, string> = {
-  morning:  'var(--block-morning, color-mix(in srgb, var(--accent) 90%, #fff 10%))',
-  midday:   'var(--block-midday,  color-mix(in srgb, var(--accent) 70%, #fff 30%))',
-  activity: 'var(--block-activity,color-mix(in srgb, var(--accent) 55%, #fff 45%))',
+  morning:  'var(--accent)',
+  midday:   'color-mix(in srgb, var(--accent) 70%, #fff 30%)',
+  activity: 'color-mix(in srgb, var(--accent) 55%, #fff 45%)',
+}
+
+/** synthesize safe non-overlapping windows if nothing provided */
+function autoDefaults(startHour: number, endHour: number) {
+  const min = startHour * 60
+  const max = endHour   * 60
+  const span = Math.max(6 * 60, max - min) // at least 6h span
+
+  // simple “bands” that fit most days; adjust if compressed
+  const m1s = min + Math.round(span * 0.15) // ~ 9:00 if start 6:00
+  const m1e = m1s + 90                       // 1.5h
+
+  const m2s = min + Math.round(span * 0.45)  // ~ 13:30
+  const m2e = m2s + 120                      // 2h
+
+  const a1s = min + Math.round(span * 0.75)  // ~ 17:30
+  const a1e = a1s + 60                       // 1h
+
+  const clamp = (m: number) => Math.max(min, Math.min(max, m))
+  const fix = (s: number, e: number, minDur = 30) => {
+    s = clamp(s); e = clamp(e)
+    if (e - s < minDur) e = Math.min(max, s + minDur)
+    return [s, e] as const
+  }
+
+  return {
+    morning:  fix(m1s, m1e, 45),
+    midday:   fix(m2s, m2e, 45),
+    activity: fix(a1s, a1e, 30),
+  }
 }
 
 export default function HourGridVertical({
@@ -66,7 +88,7 @@ export default function HourGridVertical({
   startHour = 6,
   endHour = 22,
   hourPx = 48,
-  onEdit,
+  onEdit, // compat alias
 }: Props) {
   // ---- timeline math
   const MIN = startHour * 60
@@ -88,7 +110,54 @@ export default function HourGridVertical({
   const [drag, setDrag] = React.useState<DragState>(null)
   const ref = React.useRef<HTMLDivElement | null>(null)
 
-  // ---- helpers
+  // Turn various inputs into minutes or undefined
+  const parseRange = (start?: string, end?: string, fallback?: {start?: string; end?: string}) => {
+    const s = start ? toMin(start) : (fallback?.start ? toMin(fallback.start) : undefined)
+    const e = end   ? toMin(end)   : (fallback?.end   ? toMin(fallback.end)   : undefined)
+    return (typeof s === 'number' && typeof e === 'number' && e > s) ? [s, e] : undefined
+  }
+
+  // Effective ranges for render: actual → suggested → autoDefaults
+  const effective = React.useMemo(() => {
+    const auto = autoDefaults(startHour, endHour)
+
+    const morningRaw  = parseRange(morningActualStart, morningActualEnd, suggested?.morning)
+    const middayRaw   = parseRange(middayActualStart,  middayActualEnd,  suggested?.midday)
+    const activityRaw = parseRange(activityActualStart,activityActualEnd,suggested?.activity)
+
+    // seed with something valid
+    let morning  = morningRaw  ?? auto.morning
+    let midday   = middayRaw   ?? auto.midday
+    let activity = activityRaw ?? auto.activity
+
+    // coerce overlaps in order morning → midday → activity
+    const minDur = { morning:45, midday:45, activity:30 } as const
+    const ensure = (s: number, e: number, wantMin: number) => {
+      s = clamp(s); e = clamp(e)
+      if (e - s < wantMin) e = Math.min(MAX, s + wantMin)
+      if (e <= s) e = Math.min(MAX, s + wantMin)
+      return [s, e] as const
+    }
+
+    // keep midday ≥ morning.end
+    if (midday[0] < morning[1]) midday = ensure(Math.max(morning[1], midday[0]), Math.max(morning[1] + minDur.midday, midday[1]), minDur.midday)
+    // keep activity ≥ midday.end
+    if (activity[0] < midday[1]) activity = ensure(Math.max(midday[1], activity[0]), Math.max(midday[1] + minDur.activity, activity[1]), minDur.activity)
+
+    // Final clamp in bounds
+    morning  = ensure(morning[0],  morning[1],  minDur.morning)
+    midday   = ensure(midday[0],   midday[1],   minDur.midday)
+    activity = ensure(activity[0], activity[1], minDur.activity)
+
+    return { morning, midday, activity }
+  }, [
+    morningActualStart, morningActualEnd,
+    middayActualStart,  middayActualEnd,
+    activityActualStart,activityActualEnd,
+    suggested, startHour, endHour
+  ])
+
+  // Mouse coord → minutes
   const pyToMin = (clientY: number) => {
     const el = ref.current
     if (!el) return MIN
@@ -97,12 +166,7 @@ export default function HourGridVertical({
     return Math.round(MIN + ratio * RANGE)
   }
 
-  const getBlockTimes = (k: BlockKey) => {
-    if (k === 'morning')  return [toMin(morningActualStart, suggested?.morning?.start),  toMin(morningActualEnd, suggested?.morning?.end)]
-    if (k === 'midday')   return [toMin(middayActualStart,  suggested?.midday?.start),   toMin(middayActualEnd,  suggested?.midday?.end)]
-    return [toMin(activityActualStart, suggested?.activity?.start), toMin(activityActualEnd, suggested?.activity?.end)]
-  }
-
+  // Persist new minutes to parent
   const setBlockTimes = (k: BlockKey, sMin: number, eMin: number) => {
     const start = toHHMM(clamp(snap(sMin)))
     const end   = toHHMM(clamp(snap(eMin)))
@@ -111,13 +175,13 @@ export default function HourGridVertical({
     else onChange({ activityActualStart: start, activityActualEnd: end })
   }
 
-  // Overlap guard (optional)
+  // Optional overlap guard during drag
   const coerceNoOverlap = (which: BlockKey, s: number, e: number) => {
     if (!preventOverlap) return [clamp(s), clamp(e)] as const
     const ranges: Record<BlockKey, [number, number]> = {
-      morning:  getBlockTimes('morning') as [number, number],
-      midday:   getBlockTimes('midday')  as [number, number],
-      activity: getBlockTimes('activity')as [number, number],
+      morning:  effective.morning,
+      midday:   effective.midday,
+      activity: effective.activity,
     }
     const keys: BlockKey[] = ['morning','midday','activity']
     for (const k of keys) {
@@ -135,7 +199,7 @@ export default function HourGridVertical({
   const onMouseDownBlock = (e: React.MouseEvent, which: BlockKey, kind: DragState['kind']) => {
     e.preventDefault()
     onSelect?.(which)
-    const [s, ed] = getBlockTimes(which)
+    const [s, ed] = effective[which]
     setDrag({ kind, which, startMin: s, endMin: ed, originY: e.clientY })
   }
 
@@ -189,16 +253,17 @@ export default function HourGridVertical({
       )
     }
     return out
-  }, [startHour, endHour])
+  }, [startHour, endHour, MIN, RANGE])
 
   const ghost = (sl?: {start:string,end:string}) => {
     if (!sl) return null
     const s = toMin(sl.start), e = toMin(sl.end)
+    if (!(s < e)) return null
     return <div className="vgrid__ghost" style={styleFor(s,e)} />
   }
 
   const renderBlock = (k: BlockKey) => {
-    const [s, e] = getBlockTimes(k)
+    const [s, e] = effective[k]
     const label = labels?.[k] ?? (k[0].toUpperCase() + k.slice(1))
     const isActive = active === k
     return (
@@ -209,11 +274,7 @@ export default function HourGridVertical({
         aria-label={label}
         aria-pressed={isActive}
         tabIndex={0}
-        onClick={() => {
-          onSelect?.(k)
-          onEdit?.(k)
-          onOpenFlyout?.(k)
-        }}
+        onClick={() => { onSelect?.(k); onEdit?.(k); onOpenFlyout?.(k) }}
         onDoubleClick={() => onRequestFocusTimes?.(k, 'both')}
         onKeyDown={(ev) => {
           if (!isActive) return
@@ -222,21 +283,12 @@ export default function HourGridVertical({
           if (ev.key === 'ArrowDown'){ ev.preventDefault(); onNudgeRequest?.(k,  step) }
         }}
       >
-        <div
-          className="vgrid__handle handle--start"
-          onMouseDown={(ev)=>onMouseDownBlock(ev, k, 'resize-start')}
-        />
-        <div
-          className="vgrid__drag"
-          onMouseDown={(ev)=>onMouseDownBlock(ev, k, 'move')}
-        >
+        <div className="vgrid__handle handle--start" onMouseDown={(ev)=>onMouseDownBlock(ev, k, 'resize-start')} />
+        <div className="vgrid__drag" onMouseDown={(ev)=>onMouseDownBlock(ev, k, 'move')}>
           <span className="vgrid__drag-label">{label}</span>
           <span className="vgrid__time">{toHHMM(s)}–{toHHMM(e)}</span>
         </div>
-        <div
-          className="vgrid__handle handle--end"
-          onMouseDown={(ev)=>onMouseDownBlock(ev, k, 'resize-end')}
-        />
+        <div className="vgrid__handle handle--end" onMouseDown={(ev)=>onMouseDownBlock(ev, k, 'resize-end')} />
       </div>
     )
   }
@@ -244,17 +296,15 @@ export default function HourGridVertical({
   return (
     <div className="vgrid" aria-label="Day timeline">
       <div className="vgrid__rail" ref={ref} style={{ height: railHeight }}>
-        {/* ghosts */}
+        {/* ghosts (suggested) */}
         {ghost(suggested?.morning)}
         {ghost(suggested?.midday)}
         {ghost(suggested?.activity)}
-
-        {/* blocks */}
+        {/* blocks (always have safe effective times now) */}
         {renderBlock('morning')}
         {renderBlock('midday')}
         {renderBlock('activity')}
-
-        {/* marks */}
+        {/* hour marks */}
         <div className="vgrid__marks">{hourMarks}</div>
       </div>
     </div>
