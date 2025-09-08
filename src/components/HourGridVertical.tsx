@@ -5,38 +5,49 @@ import { toMin, toHHMM } from '../utils/time'
 type BlockKey = 'morning' | 'midday' | 'activity'
 
 type Props = {
+  // Times
   morningActualStart?: string; morningActualEnd?: string
   middayActualStart?: string;  middayActualEnd?: string
   activityActualStart?: string; activityActualEnd?: string
+
+  // Suggested (ghosts)
   suggested?: {
     morning?: { start: string, end: string }
     midday?:  { start: string, end: string }
     activity?:{ start: string, end: string }
   }
+
+  // Labels override
   labels?: Partial<Record<BlockKey, string>>
+
+  // Data update
   onChange: (patch: Partial<any>) => void
 
-  /** Selection + UX hooks */
+  // Selection + UX hooks
   active?: BlockKey | null
   onSelect?: (which: BlockKey) => void
   onRequestFocusTimes?: (which: BlockKey, whichField: 'start' | 'end' | 'both') => void
   onNudgeRequest?: (which: BlockKey, minutesDelta: number) => void
 
-  /** Optional: open your flyout from here */
+  // Optional: open your flyout from here
   onOpenFlyout?: (which: BlockKey) => void
 
-  /** Behavior */
+  // Optional: called when user clicks a block (used by tests/DayCard to open flyout)
+  onEdit?: (which: BlockKey) => void
+
+  // Behavior
   preventOverlap?: boolean
 
+  // Layout
   startHour?: number  // default 6
   endHour?: number    // default 22
   hourPx?: number     // pixels per hour (default 48)
 }
 
 const DEFAULT_COLORS: Record<BlockKey, string> = {
-  morning:  'var(--accent)',
-  midday:   'color-mix(in srgb, var(--accent) 70%, #fff 30%)',
-  activity: 'color-mix(in srgb, var(--accent) 55%, #fff 45%)',
+  morning:  'var(--block-morning, color-mix(in srgb, var(--accent) 90%, #fff 10%))',
+  midday:   'var(--block-midday,  color-mix(in srgb, var(--accent) 70%, #fff 30%))',
+  activity: 'var(--block-activity,color-mix(in srgb, var(--accent) 55%, #fff 45%))',
 }
 
 export default function HourGridVertical({
@@ -55,6 +66,7 @@ export default function HourGridVertical({
   startHour = 6,
   endHour = 22,
   hourPx = 48,
+  onEdit,
 }: Props) {
   // ---- timeline math
   const MIN = startHour * 60
@@ -177,7 +189,7 @@ export default function HourGridVertical({
       )
     }
     return out
-  }, [startHour, endHour]) // ← no date formatting here at all
+  }, [startHour, endHour])
 
   const ghost = (sl?: {start:string,end:string}) => {
     if (!sl) return null
@@ -193,14 +205,16 @@ export default function HourGridVertical({
       <div
         className={`vgrid__block${isActive ? ' is-active' : ''}`}
         style={{ ...styleFor(s,e), background: DEFAULT_COLORS[k] }}
-        onClick={() => onSelect?.(k)}
-        onDoubleClick={() => {
-          onOpenFlyout?.(k)
-          onRequestFocusTimes?.(k, 'both')
-        }}
         role="button"
+        aria-label={label}
         aria-pressed={isActive}
         tabIndex={0}
+        onClick={() => {
+          onSelect?.(k)
+          onEdit?.(k)
+          onOpenFlyout?.(k)
+        }}
+        onDoubleClick={() => onRequestFocusTimes?.(k, 'both')}
         onKeyDown={(ev) => {
           if (!isActive) return
           const step = ev.altKey ? 30 : ev.shiftKey ? 5 : 15
@@ -208,12 +222,21 @@ export default function HourGridVertical({
           if (ev.key === 'ArrowDown'){ ev.preventDefault(); onNudgeRequest?.(k,  step) }
         }}
       >
-        <div className="vgrid__handle handle--start" onMouseDown={(ev)=>onMouseDownBlock(ev, k, 'resize-start')} />
-        <div className="vgrid__drag" onMouseDown={(ev)=>onMouseDownBlock(ev, k, 'move')}>
+        <div
+          className="vgrid__handle handle--start"
+          onMouseDown={(ev)=>onMouseDownBlock(ev, k, 'resize-start')}
+        />
+        <div
+          className="vgrid__drag"
+          onMouseDown={(ev)=>onMouseDownBlock(ev, k, 'move')}
+        >
           <span className="vgrid__drag-label">{label}</span>
           <span className="vgrid__time">{toHHMM(s)}–{toHHMM(e)}</span>
         </div>
-        <div className="vgrid__handle handle--end" onMouseDown={(ev)=>onMouseDownBlock(ev, k, 'resize-end')} />
+        <div
+          className="vgrid__handle handle--end"
+          onMouseDown={(ev)=>onMouseDownBlock(ev, k, 'resize-end')}
+        />
       </div>
     )
   }
@@ -225,10 +248,12 @@ export default function HourGridVertical({
         {ghost(suggested?.morning)}
         {ghost(suggested?.midday)}
         {ghost(suggested?.activity)}
+
         {/* blocks */}
         {renderBlock('morning')}
         {renderBlock('midday')}
         {renderBlock('activity')}
+
         {/* marks */}
         <div className="vgrid__marks">{hourMarks}</div>
       </div>

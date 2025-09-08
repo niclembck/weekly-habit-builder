@@ -3,14 +3,15 @@ import * as React from 'react'
 import type { Day, Settings, DayEntry } from '../types'
 import { supabase } from '../lib/supabaseClient'
 import { useSupabaseAuth } from './useSupabaseAuth'
+import { toValidDate, startOfWeekMonday, addDays } from '../utils/dates'
 
 export const DAYS: Day[] = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
 
-function isValidDate(v: any): v is Date { return v instanceof Date && !isNaN(v.getTime()) }
-function coerceDate(v: any): Date { if (isValidDate(v)) return v; const d = new Date(v); return isNaN(d.getTime()) ? new Date() : d }
-function startOfWeekMonday(d: Date) { const x = new Date(d); const day = x.getDay() || 7; if (day !== 1) x.setDate(x.getDate() - (day - 1)); x.setHours(0,0,0,0); return x }
-function addDays(d: Date, n: number) { const x = new Date(d); x.setDate(x.getDate()+n); return x }
-function getWeekDates(weekStart: Date): Record<Day, Date> { const out = {} as Record<Day, Date>; DAYS.forEach((d,i)=>{ out[d]=addDays(weekStart,i) }); return out }
+function getWeekDates(weekStart: Date): Record<Day, Date> {
+  const out = {} as Record<Day, Date>
+  DAYS.forEach((d, i) => { out[d] = addDays(weekStart, i) })
+  return out
+}
 
 function loadJSON<T>(key: string): T | undefined { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) as T : undefined } catch { return undefined } }
 function saveJSON(key: string, value: unknown) { try { localStorage.setItem(key, JSON.stringify(value)) } catch {} }
@@ -143,10 +144,12 @@ export function useWeek() {
   const auth = useSupabaseAuth()
 
   const [weekStart, setWeekStartState] = React.useState<Date>(() => {
-    const saved = loadJSON<string>('whb_weekStart')
-    return startOfWeekMonday(saved ? coerceDate(saved) : new Date())
+    const saved = localStorage.getItem('whb_weekStart')
+    return startOfWeekMonday(saved ? toValidDate(saved) : new Date())
   })
-  function setWeekStart(next: Date | string | number) { setWeekStartState(startOfWeekMonday(coerceDate(next))) }
+  function setWeekStart(next: Date | string | number) {
+    setWeekStartState(startOfWeekMonday(toValidDate(next)))
+  }
   React.useEffect(() => { saveJSON('whb_weekStart', weekStart.toISOString()) }, [weekStart])
 
   const weekStartISO = React.useMemo(() => weekStart.toISOString().slice(0,10), [weekStart])

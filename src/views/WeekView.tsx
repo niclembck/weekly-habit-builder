@@ -4,6 +4,7 @@ import {
   useWeek, DAYS, applyDefaultsAndPatterns,
   fillBlanksWithSettings, applyTemplateToWeek
 } from '../hooks/useWeek'
+import { toValidDate, startOfWeekMonday } from '../utils/dates'
 import { Day } from '../types'
 import Dashboard from '../components/Dashboard'
 import { useProgress } from '../hooks/useProgress'
@@ -31,6 +32,15 @@ export default function WeekView() {
   const { settings, weekStart, week, setWeek, dates, ensureActivityInSettings, setWeekStart } = useWeek()
   ;(window as any).__WHB_WEEK__ = week
 
+  // Force-rerender key for MonthMini when the picker fires.
+  const [monthBump, setMonthBump] = React.useState(0)
+
+  // Forcing a re-mount when the MONTH changes is good; we’ll also bump on picker.
+  const monthKey = React.useMemo(
+    () => weekStart ? `${weekStart.getFullYear()}-${String(weekStart.getMonth()+1).padStart(2,'0')}` : 'unknown',
+    [weekStart]
+  )
+
   // Auto-fill brand-new blank weeks
   React.useEffect(() => {
     const blank = Object.values(week).every((e: any) => !(e?.morningProject || e?.middayProject || e?.activity))
@@ -56,18 +66,24 @@ export default function WeekView() {
   const [selectedDay, setSelectedDay] = React.useState<Day>(todayDay)
   React.useEffect(() => { setSelectedDay(todayDay) }, [todayDay])
 
+  // Formats we’ll reuse
+  const weekStartISO = React.useMemo(
+    () => weekStart?.toISOString?.().slice(0,10) ?? '',
+    [weekStart]
+  )
+
   // Keyboard nav
-  React.useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const i = DAYS.indexOf(selectedDay)
-      if (e.key === 'ArrowRight') { e.preventDefault(); setSelectedDay(DAYS[Math.min(DAYS.length - 1, i + 1)]) }
-      else if (e.key === 'ArrowLeft') { e.preventDefault(); setSelectedDay(DAYS[Math.max(0, i - 1)]) }
-      else if (e.key === 'Home') { e.preventDefault(); setSelectedDay(DAYS[0]) }
-      else if (e.key === 'End') { e.preventDefault(); setSelectedDay(DAYS[DAYS.length - 1]) }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [selectedDay])
+  // React.useEffect(() => {
+  //   const onKey = (e: KeyboardEvent) => {
+  //     const i = DAYS.indexOf(selectedDay)
+  //     if (e.key === 'ArrowRight') { e.preventDefault(); setSelectedDay(DAYS[Math.min(DAYS.length - 1, i + 1)]) }
+  //     else if (e.key === 'ArrowLeft') { e.preventDefault(); setSelectedDay(DAYS[Math.max(0, i - 1)]) }
+  //     else if (e.key === 'Home') { e.preventDefault(); setSelectedDay(DAYS[0]) }
+  //     else if (e.key === 'End') { e.preventDefault(); setSelectedDay(DAYS[DAYS.length - 1]) }
+  //   }
+  //   window.addEventListener('keydown', onKey)
+  //   return () => window.removeEventListener('keydown', onKey)
+  // }, [selectedDay])
 
   // URL persistence (?day=Wednesday)
   const [search, setSearch] = useSearchParams()
@@ -94,6 +110,18 @@ export default function WeekView() {
       [selectedDay]: { ...(prev as any)[selectedDay], ...patch }
     }))
   }, [setWeek, selectedDay])
+
+  const handleWeekChange = (next: unknown) => {
+    const d =
+      next instanceof Date ? next
+      : typeof next === 'string' || typeof next === 'number' ? new Date(next)
+      : null
+
+    if (!d) return
+    const normalized = startOfWeekMonday(toValidDate(d))
+    setWeekStart(normalized)
+  }
+
 
   // --- Apply Template modal (hash-controlled) ---
   const hash = window.location.hash || ''
@@ -135,6 +163,7 @@ export default function WeekView() {
     if (changed) setWeek(next)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.suggestedSlots])
+
 
   return (
     <>
@@ -213,15 +242,16 @@ export default function WeekView() {
             {/* RIGHT: mini month + picker */}
             <div className="shrink-0 flex items-center gap-4">
               <MonthMini
-                monthAnchor={weekStart}
+                key={`${weekStart?.toISOString?.().slice(0,10) ?? 'unknown'}-mm`}
+                monthAnchor={weekStart ? new Date(weekStart) : new Date()} // clone here too
                 week={week}
                 dates={dates}
                 onSelectDay={(d) => setSelectedDay(d)}
                 cellSize={16}
               />
               <WeekDatePicker
-                value={weekStart}
-                onChange={(next) => setWeekStart(next)}
+                value={weekStart ?? new Date()}
+                onChange={handleWeekChange}
               />
             </div>
           </div>

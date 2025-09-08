@@ -2,11 +2,18 @@
 import React from 'react'
 import { Day, DayEntry } from '../types'
 import { countObjectives } from '../utils/countObjectives'
+import {
+  toValidDate,
+  startOfMonth,
+  endOfMonth,
+  startOfWeekMonday,
+  addDays,
+} from '../utils/dates'
 
 type Props = {
-  monthAnchor: Date            // any date in the month to render (can be anything coercible to Date)
-  week: Record<Day, DayEntry>  // current week's entries
-  dates: Record<Day, Date>     // current week's date map
+  monthAnchor: Date
+  week: Record<Day, DayEntry>
+  dates: Record<Day, Date>
   onSelectDay?: (d: Day) => void
   cellSize?: number
 }
@@ -14,12 +21,14 @@ type Props = {
 const DAYS_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] as const
 const DAY_KEYS: Day[] = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
 
-// ---- Safe date helpers ------------------------------------------------------
-
 function toValidDate(v: any): Date {
-  const d = v instanceof Date ? v : new Date(v)
-  return isNaN(d.getTime()) ? new Date() : d
+  // Always clone so callers can't mutate the original reference
+  const d =
+    v instanceof Date ? new Date(v.getTime())
+    : new Date(v);
+  return isNaN(d.getTime()) ? new Date() : d;
 }
+
 function sameDay(a?: Date, b?: Date) {
   if (!a || !b) return false
   return toValidDate(a).toDateString() === toValidDate(b).toDateString()
@@ -30,10 +39,10 @@ function safeFormat(d?: Date, opts?: Intl.DateTimeFormatOptions) {
   return isNaN(x.getTime()) ? '' : x.toLocaleDateString(undefined, opts)
 }
 function startOfMonth(d: Date) { const x = toValidDate(d); x.setDate(1); x.setHours(0,0,0,0); return x }
-function endOfMonth(d: Date) { const x = toValidDate(d); x.setMonth(x.getMonth()+1,0); x.setHours(0,0,0,0); return x }
+function endOfMonth(d: Date)   { const x = toValidDate(d); x.setMonth(x.getMonth()+1,0); x.setHours(0,0,0,0); return x }
 function startOfWeekMonday(d: Date) {
   const x = toValidDate(d)
-  const day = (x.getDay() || 7) // Sun->7
+  const day = (x.getDay() || 7)
   if (day !== 1) x.setDate(x.getDate() - (day - 1))
   x.setHours(0,0,0,0)
   return x
@@ -47,25 +56,18 @@ export default function MonthMini({
   onSelectDay,
   cellSize = 18,
 }: Props) {
-  // Anchor the month safely
   const anchor = React.useMemo(() => toValidDate(monthAnchor), [monthAnchor])
-  const today = React.useMemo(() => new Date(), [])
+  const today  = React.useMemo(() => new Date(), [])
 
-  const mo = React.useMemo(() => startOfMonth(anchor), [anchor])
-  const lo = React.useMemo(() => endOfMonth(anchor), [anchor])
+  const mo = startOfMonth(anchor)
+  const lo = endOfMonth(anchor)
 
-  // grid runs from the Monday on/preceding the 1st to the Sunday on/following the last day
-  const gridStart = React.useMemo(() => startOfWeekMonday(mo), [mo])
-  const gridEnd = React.useMemo(() => addDays(startOfWeekMonday(addDays(lo, 7)), -1), [lo])
+  const gridStart = startOfWeekMonday(mo)
+  const gridEnd   = addDays(startOfWeekMonday(addDays(lo, 7)), -1)
 
-  // Build array of dates
-  const days: Date[] = React.useMemo(() => {
-    const out: Date[] = []
-    for (let d = new Date(gridStart); d <= gridEnd; d = addDays(d, 1)) out.push(new Date(d))
-    return out
-  }, [gridStart, gridEnd])
+  const days: Date[] = []
+  for (let d = new Date(gridStart); d <= gridEnd; d = addDays(d, 1)) days.push(new Date(d))
 
-  // map current week's dates -> day key for quick lookup
   const weekMap = React.useMemo(() => {
     const m = new Map<string, Day>()
     for (const dk of DAY_KEYS) {
@@ -75,9 +77,7 @@ export default function MonthMini({
     return m
   }, [dates])
 
-  // helper: color intensity based on completion %
   function bgForPct(pct: number) {
-    // 0 → very faint; 100 → solid accent
     const a =
       pct >= 100 ? 1.0 :
       pct >= 75  ? 0.8 :
@@ -86,7 +86,6 @@ export default function MonthMini({
     return `color-mix(in srgb, var(--accent) ${Math.round(a*100)}%, transparent)`
   }
 
-  // style tokens
   const size = cellSize
   const cellStyle: React.CSSProperties = {
     width: size, height: size,
@@ -96,20 +95,15 @@ export default function MonthMini({
     fontSize: 10, lineHeight: 1, userSelect: 'none',
   }
 
-  // Which dates are the current week (to outline that row subtly)
-  const currentWeekDates = React.useMemo(
-    () => new Set<string>(Object.values(dates).map(d => d ? toValidDate(d).toDateString() : '')),
-    [dates]
-  )
+  const currentWeekDates = new Set<string>(Object.values(dates).map(d => d ? toValidDate(d).toDateString() : ''))
 
-  // Month label (guarded)
-  const monthLabel = safeFormat(anchor, { month: 'short', year: 'numeric' })
+  const monthLabel = anchor.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
 
   return (
     <div className="monthmini" style={{ display:'grid', gap: 8 }}>
       <div className="flex items-center justify-between">
         <div className="muted text-xs">{monthLabel}</div>
-        <div className="flex items-center gap:2">
+        <div className="flex items-center gap-2">
           <span className="muted text-[10px]">Completion</span>
           <span title="low"  style={{ width:10, height:10, borderRadius:2, background:bgForPct(25),  display:'inline-block' }} />
           <span title="med"  style={{ width:10, height:10, borderRadius:2, background:bgForPct(50),  display:'inline-block' }} />
@@ -117,7 +111,6 @@ export default function MonthMini({
         </div>
       </div>
 
-      {/* weekday headers */}
       <div className="grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
         {DAYS_LABELS.map(lbl => (
           <div key={lbl} className="muted text-[10px] text-center" style={{ paddingBottom: 2 }}>
@@ -126,29 +119,24 @@ export default function MonthMini({
         ))}
       </div>
 
-      {/* calendar grid */}
       <div className="grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
         {days.map((raw) => {
           const d = toValidDate(raw)
           const inMonth = d.getMonth() === mo.getMonth()
           const isToday = sameDay(d, today)
-          const dKey = weekMap.get(d.toDateString()) // only populated for the current week
+          const dKey = weekMap.get(d.toDateString())
           const pct = dKey ? countObjectives(week[dKey]).pct : null
 
           const bg = pct != null ? bgForPct(pct) : (inMonth ? 'rgba(148,163,184,.14)' : 'transparent')
           const fg = inMonth ? 'var(--title)' : 'var(--meta)'
-          const title =
-            safeFormat(d, { weekday:'short', month:'short', day:'numeric' }) +
+          const title = safeFormat(d, { weekday:'short', month:'short', day:'numeric' }) +
             (pct != null ? ` — ${pct}% complete` : '')
 
-          // subtle outline for cells that belong to the currently displayed week
           const outline = currentWeekDates.has(d.toDateString())
             ? '1px solid color-mix(in srgb, var(--accent) 40%, transparent)'
             : '1px solid color-mix(in srgb, var(--border) 70%, transparent)'
 
-          const onClick = dKey && onSelectDay
-            ? () => onSelectDay(dKey)
-            : undefined
+          const onClick = dKey && onSelectDay ? () => onSelectDay(dKey) : undefined
 
           return (
             <button
@@ -169,8 +157,6 @@ export default function MonthMini({
               }}
             >
               <span style={{ fontSize: 10, opacity: 0.9 }}>{d.getDate()}</span>
-
-              {/* today ring */}
               {isToday && (
                 <span
                   aria-hidden
