@@ -16,8 +16,7 @@ import ApplyTemplateModal, { ApplyOptions } from '../components/ApplyTemplateMod
 import { useSearchParams } from 'react-router-dom'
 import { useToday } from '../hooks/useToday'
 import { countObjectives } from '../utils/countObjectives'
-import WeekDatePicker from '../components/WeekDatePicker'
-import MonthMini from '../components/MonthMini'
+import MonthNavigator from '../components/MonthNavigator'
 
 export default function WeekView() {
   const SHOW_WEEK_INSIGHTS = false
@@ -64,7 +63,6 @@ export default function WeekView() {
   // Today & selection
   const todayDay = useToday(dates)
   const [selectedDay, setSelectedDay] = React.useState<Day>(todayDay)
-  React.useEffect(() => { setSelectedDay(todayDay) }, [todayDay])
 
   // Formats we’ll reuse
   const weekStartISO = React.useMemo(
@@ -241,17 +239,14 @@ export default function WeekView() {
 
             {/* RIGHT: mini month + picker */}
             <div className="shrink-0 flex items-center gap-4">
-              <MonthMini
-                key={`${weekStart?.toISOString?.().slice(0,10) ?? 'unknown'}-mm`}
-                monthAnchor={weekStart ? new Date(weekStart) : new Date()} // clone here too
+              <MonthNavigator
+                weekStart={weekStart}
+                setWeekStart={setWeekStart}
                 week={week}
                 dates={dates}
-                onSelectDay={(d) => setSelectedDay(d)}
+                onChangeWeekStart={(d) => setWeekStart(d)}
+                onSelectDay={(d) => setSelectedDay(d)} // optional, keeps your “click a date, jump to day” behavior
                 cellSize={16}
-              />
-              <WeekDatePicker
-                value={weekStart ?? new Date()}
-                onChange={handleWeekChange}
               />
             </div>
           </div>
